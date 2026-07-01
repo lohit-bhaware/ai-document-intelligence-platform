@@ -1,0 +1,54 @@
+package com.docai.shared;
+
+import jakarta.persistence.AttributeConverter;
+import jakarta.persistence.Converter;
+import org.postgresql.util.PGobject;
+import java.sql.SQLException;
+import java.util.Arrays;
+
+@Converter(autoApply = false)
+public class VectorConverter implements AttributeConverter<float[], PGobject> {
+
+    @Override
+    public PGobject convertToDatabaseColumn(float[] attribute) {
+        if (attribute == null) {
+            return null;
+        }
+        try {
+            PGobject pgObject = new PGobject();
+            pgObject.setType("vector");
+            // Converts float[] to "[val1, val2, ...]" format
+            pgObject.setValue(Arrays.toString(attribute));
+            return pgObject;
+        } catch (SQLException e) {
+            throw new IllegalArgumentException("Error converting float[] to PGobject vector", e);
+        }
+    }
+
+    @Override
+    public float[] convertToEntityAttribute(PGobject dbData) {
+        if (dbData == null) {
+            return null;
+        }
+        String value = dbData.getValue();
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        
+        // Remove enclosing brackets [ and ]
+        if (value.startsWith("[") && value.endsWith("]")) {
+            value = value.substring(1, value.length() - 1);
+        }
+        
+        if (value.trim().isEmpty()) {
+            return new float[0];
+        }
+        
+        String[] parts = value.split(",");
+        float[] result = new float[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            result[i] = Float.parseFloat(parts[i].trim());
+        }
+        return result;
+    }
+}
