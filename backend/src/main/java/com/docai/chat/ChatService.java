@@ -127,59 +127,58 @@ public class ChatService {
             List<RagService.HistoryEntry> recentHistory = getRecentHistory(allMessages, 4);
 
             // Build prompt (System → Context → History → User question)
-            List<org.springframework.ai.chat.messages.Message> promptMessages =
-                    ragService.buildPromptMessages(chunks, recentHistory, question);
+            List<org.springframework.ai.chat.messages.Message> promptMessages = ragService.buildPromptMessages(chunks,
+                    recentHistory, question);
             Prompt prompt = new Prompt(promptMessages);
 
-            // Stream the response from OpenAI
+            // Stream the response from Gemini
             StringBuilder fullResponse = new StringBuilder();
 
             Disposable subscription = streamingChatModel.stream(prompt).subscribe(
-                chatResponse -> {
-                    try {
-                        String token = extractToken(chatResponse);
-                        if (token != null && !token.isEmpty()) {
-                            fullResponse.append(token);
-                            emitter.send(SseEmitter.event()
-                                    .name("token")
-                                    .data("{\"token\":\"" + escapeJson(token) + "\"}"));
+                    chatResponse -> {
+                        try {
+                            String token = extractToken(chatResponse);
+                            if (token != null && !token.isEmpty()) {
+                                fullResponse.append(token);
+                                emitter.send(SseEmitter.event()
+                                        .name("token")
+                                        .data("{\"token\":\"" + escapeJson(token) + "\"}"));
+                            }
+                        } catch (IOException e) {
+                            // Client disconnected
                         }
-                    } catch (IOException e) {
-                        // Client disconnected
-                    }
-                },
-                error -> {
-                    sendErrorEvent(emitter, error.getMessage() != null ? error.getMessage() : "Streaming failed");
-                },
-                () -> {
-                    try {
-                        // Build citations from the chunks that were used
-                        String citationsJson = buildCitationsJson(chunks);
+                    },
+                    error -> {
+                        sendErrorEvent(emitter, error.getMessage() != null ? error.getMessage() : "Streaming failed");
+                    },
+                    () -> {
+                        try {
+                            // Build citations from the chunks that were used
+                            String citationsJson = buildCitationsJson(chunks);
 
-                        // Save assistant message to DB
-                        ChatMessage assistantMsg = new ChatMessage();
-                        assistantMsg.setConversation(conversation);
-                        assistantMsg.setRole("assistant");
-                        assistantMsg.setContent(fullResponse.toString());
-                        assistantMsg.setCitations(citationsJson);
-                        ChatMessage savedMsg = messageRepository.save(assistantMsg);
+                            // Save assistant message to DB
+                            ChatMessage assistantMsg = new ChatMessage();
+                            assistantMsg.setConversation(conversation);
+                            assistantMsg.setRole("assistant");
+                            assistantMsg.setContent(fullResponse.toString());
+                            assistantMsg.setCitations(citationsJson);
+                            ChatMessage savedMsg = messageRepository.save(assistantMsg);
 
-                        // Send citations event
-                        emitter.send(SseEmitter.event()
-                                .name("citations")
-                                .data("{\"citations\":" + citationsJson + "}"));
+                            // Send citations event
+                            emitter.send(SseEmitter.event()
+                                    .name("citations")
+                                    .data("{\"citations\":" + citationsJson + "}"));
 
-                        // Send done event
-                        emitter.send(SseEmitter.event()
-                                .name("done")
-                                .data("{\"messageId\":\"" + savedMsg.getId() + "\"}"));
+                            // Send done event
+                            emitter.send(SseEmitter.event()
+                                    .name("done")
+                                    .data("{\"messageId\":\"" + savedMsg.getId() + "\"}"));
 
-                        emitter.complete();
-                    } catch (IOException e) {
-                        // Client disconnected
-                    }
-                }
-            );
+                            emitter.complete();
+                        } catch (IOException e) {
+                            // Client disconnected
+                        }
+                    });
 
             // Clean up subscription if client disconnects
             emitter.onCompletion(subscription::dispose);
@@ -218,7 +217,8 @@ public class ChatService {
     }
 
     private List<RagService.HistoryEntry> getRecentHistory(List<ChatMessage> allMessages, int maxPairs) {
-        // Get the last N messages (excluding the user message we just saved, which is the last one)
+        // Get the last N messages (excluding the user message we just saved, which is
+        // the last one)
         // We want the last 4 messages BEFORE the current question
         List<ChatMessage> history = allMessages.size() > 1
                 ? allMessages.subList(0, allMessages.size() - 1) // exclude current user message
@@ -234,7 +234,7 @@ public class ChatService {
 
     private String extractToken(ChatResponse chatResponse) {
         if (chatResponse == null || chatResponse.getResult() == null ||
-            chatResponse.getResult().getOutput() == null) {
+                chatResponse.getResult().getOutput() == null) {
             return null;
         }
         return chatResponse.getResult().getOutput().getContent();
@@ -250,12 +250,13 @@ public class ChatService {
     }
 
     private String escapeJson(String text) {
-        if (text == null) return "";
+        if (text == null)
+            return "";
         return text.replace("\\", "\\\\")
-                   .replace("\"", "\\\"")
-                   .replace("\n", "\\n")
-                   .replace("\r", "\\r")
-                   .replace("\t", "\\t");
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     private void sendErrorEvent(SseEmitter emitter, String message) {

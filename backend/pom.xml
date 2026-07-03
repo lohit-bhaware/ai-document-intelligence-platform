@@ -95,6 +95,13 @@
             <version>0.1.6</version>
         </dependency>
 
+        <!-- Hibernate Vector (native pgvector type support for Hibernate 6.4+) -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-vector</artifactId>
+            <version>${hibernate.version}</version>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>

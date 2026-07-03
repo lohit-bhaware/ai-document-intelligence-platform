@@ -78,8 +78,15 @@ public class DocumentService {
 
         Document savedDoc = documentRepository.save(document);
 
-        // Trigger background processing via a separate bean (cross-bean call enables @Async proxy)
-        documentProcessingService.processDocumentAsync(savedDoc.getId());
+        // Trigger background processing AFTER the transaction commits,
+        // so the async thread can find the document in the DB.
+        org.springframework.transaction.support.TransactionSynchronizationManager
+                .registerSynchronization(new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        documentProcessingService.processDocumentAsync(savedDoc.getId());
+                    }
+                });
 
         return mapToDto(savedDoc);
     }

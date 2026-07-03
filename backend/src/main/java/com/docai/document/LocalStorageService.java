@@ -18,7 +18,7 @@ public class LocalStorageService implements StorageService {
     private final Path rootLocation;
 
     public LocalStorageService(@Value("${app.upload.dir}") String uploadDir) {
-        this.rootLocation = Paths.get(uploadDir);
+        this.rootLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
         try {
             Files.createDirectories(rootLocation);
         } catch (IOException e) {

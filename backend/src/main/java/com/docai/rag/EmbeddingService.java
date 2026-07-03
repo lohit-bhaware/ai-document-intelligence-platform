@@ -21,12 +21,12 @@ public class EmbeddingService {
             return embeddings;
         }
 
-        // Batch embedding calls: 50 chunks per OpenAI request
+        // Batch embedding calls: 50 chunks per Gemini request
         int batchSize = 50;
         for (int i = 0; i < chunks.size(); i += batchSize) {
             List<String> batch = chunks.subList(i, Math.min(i + batchSize, chunks.size()));
             EmbeddingResponse response = embeddingModel.call(new EmbeddingRequest(batch, null));
-            
+
             for (org.springframework.ai.embedding.Embedding res : response.getResults()) {
                 List<Double> output = res.getOutput();
                 float[] vector = new float[output.size()];
