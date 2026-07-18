@@ -31,7 +31,7 @@ public class DocumentChunk {
 
     @Column(name = "embedding")
     @JdbcTypeCode(SqlTypes.VECTOR)
-    @Array(length = 1536)
+    @Array(length = 3072)
     private float[] embedding;
 
     @Column(name = "chunk_index", nullable = false)

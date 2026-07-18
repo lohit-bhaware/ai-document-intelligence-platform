@@ -94,7 +94,7 @@ function UploadZone({ onUpload, isUploading }) {
         {isUploading && (
           <div className="upload-progress-container">
             <div className="upload-progress-bar">
-              <div className="upload-progress-fill" style={{ width: '70%' }}></div>
+              <div className="upload-progress-fill upload-progress-indeterminate"></div>
             </div>
           </div>
         )}

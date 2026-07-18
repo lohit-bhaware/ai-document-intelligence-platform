@@ -3,6 +3,8 @@ package com.docai.document;
 import com.docai.rag.ParsingService;
 import com.docai.rag.RagService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class DocumentProcessingService {
+
+    private static final Logger log = LoggerFactory.getLogger(DocumentProcessingService.class);
 
     private final DocumentRepository documentRepository;
     private final ParsingService parsingService;
@@ -46,11 +50,11 @@ public class DocumentProcessingService {
             updateStatus(documentId, "READY", null, chunkCount);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Document processing failed for documentId={}", documentId, e);
             try {
                 updateStatus(documentId, "FAILED", e.getMessage() != null ? e.getMessage() : e.toString(), 0);
             } catch (Exception ex) {
-                ex.printStackTrace();
+                log.error("Failed to update status for documentId={}", documentId, ex);
             }
         }
     }

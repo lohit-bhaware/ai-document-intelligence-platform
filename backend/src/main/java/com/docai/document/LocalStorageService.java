@@ -2,6 +2,7 @@ package com.docai.document;
 
 import com.docai.shared.BadRequestException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -13,6 +14,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
+@ConditionalOnProperty(name = "app.r2.enabled", havingValue = "false", matchIfMissing = true)
 public class LocalStorageService implements StorageService {
 
     private final Path rootLocation;

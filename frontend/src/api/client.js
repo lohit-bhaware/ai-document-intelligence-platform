@@ -127,7 +127,7 @@ export async function deleteDocument(id) {
   });
 }
 
-// Placeholder export methods for chat operations
+// Chat operations
 export async function getChatHistory(docId) {
   return request(`/chat/${docId}/history`);
 }
@@ -136,4 +136,97 @@ export async function clearChatHistory(docId) {
   return request(`/chat/${docId}/history`, {
     method: 'DELETE',
   });
+}
+
+/**
+ * Stream a chat query via SSE (POST endpoint with JSON body).
+ * Native EventSource only supports GET, so we use fetch + ReadableStream.
+ *
+ * @param {string} docId - Document UUID
+ * @param {string} message - User question
+ * @param {Object} callbacks - { onToken, onCitations, onDone, onError }
+ * @returns {function} abort - Call to cancel the stream
+ */
+export function streamQuery(docId, message, { onToken, onCitations, onDone, onError }) {
+  const controller = new AbortController();
+  const token = getToken();
+
+  fetch(`${API_URL}/chat/${docId}/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message }),
+    signal: controller.signal,
+  })
+    .then(async (response) => {
+      if (response.status === 401) {
+        setToken(null);
+        setUser(null);
+        window.location.href = '/login';
+        return;
+      }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        onError(errorData.error || `Server error: ${response.status}`);
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        // Keep the last potentially incomplete line in the buffer
+        buffer = lines.pop() || '';
+
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            currentEvent = line.substring(6).trim();
+          } else if (line.startsWith('data:')) {
+            const dataStr = line.substring(5).trim();
+            if (!dataStr) continue;
+
+            try {
+              const data = JSON.parse(dataStr);
+
+              switch (currentEvent) {
+                case 'token':
+                  if (data.token !== undefined) onToken(data.token);
+                  break;
+                case 'citations':
+                  if (data.citations) onCitations(data.citations);
+                  break;
+                case 'done':
+                  onDone(data.messageId);
+                  break;
+                case 'error':
+                  onError(data.message || 'Streaming failed');
+                  break;
+                default:
+                  break;
+              }
+            } catch {
+              // Skip malformed JSON lines
+            }
+            currentEvent = '';
+          }
+        }
+      }
+    })
+    .catch((err) => {
+      if (err.name !== 'AbortError') {
+        onError(err.message || 'Connection failed');
+      }
+    });
+
+  // Return an abort function the caller can use to cancel the stream
+  return () => controller.abort();
 }
