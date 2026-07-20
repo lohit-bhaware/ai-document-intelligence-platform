@@ -1,9 +1,9 @@
 package com.docai.document;
 
-import com.docai.auth.AuthRepository;
 import com.docai.auth.User;
 import com.docai.shared.BadRequestException;
 import com.docai.shared.ResourceNotFoundException;
+import com.docai.shared.UserResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 public class DocumentService {
 
     private final DocumentRepository documentRepository;
-    private final AuthRepository authRepository;
+    private final UserResolver userResolver;
     private final StorageService storageService;
     private final DocumentProcessingService documentProcessingService;
 
@@ -31,8 +31,7 @@ public class DocumentService {
     }
 
     public DocumentDto getDocument(UUID id, String userEmail) {
-        User user = authRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userResolver.resolve(userEmail);
 
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
@@ -46,8 +45,7 @@ public class DocumentService {
 
     @Transactional
     public DocumentDto uploadDocument(MultipartFile file, String userEmail) {
-        User user = authRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userResolver.resolve(userEmail);
 
         if (file.isEmpty()) {
             throw new BadRequestException("File is empty");
@@ -93,8 +91,7 @@ public class DocumentService {
 
     @Transactional
     public void deleteDocument(UUID id, String userEmail) {
-        User user = authRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User user = userResolver.resolve(userEmail);
 
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found"));

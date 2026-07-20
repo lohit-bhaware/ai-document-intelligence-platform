@@ -1,6 +1,5 @@
 package com.docai.chat;
 
-import com.docai.auth.AuthRepository;
 import com.docai.auth.User;
 import com.docai.document.Document;
 import com.docai.document.DocumentRepository;
@@ -8,6 +7,7 @@ import com.docai.rag.DocumentChunk;
 import com.docai.rag.RagService;
 import com.docai.shared.BadRequestException;
 import com.docai.shared.ResourceNotFoundException;
+import com.docai.shared.UserResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -32,7 +32,7 @@ public class ChatService {
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final DocumentRepository documentRepository;
-    private final AuthRepository authRepository;
+    private final UserResolver userResolver;
     private final RagService ragService;
     private final StreamingChatModel streamingChatModel;
     private final ObjectMapper objectMapper;
@@ -42,7 +42,7 @@ public class ChatService {
     // ────────────────────────────────────────────
 
     public ChatHistoryResponse getHistory(UUID docId, String userEmail) {
-        User user = resolveUser(userEmail);
+        User user = userResolver.resolve(userEmail);
         Document document = resolveDocument(docId, user);
 
         Conversation conversation = conversationRepository
@@ -72,7 +72,7 @@ public class ChatService {
 
     @Transactional
     public void clearHistory(UUID docId, String userEmail) {
-        User user = resolveUser(userEmail);
+        User user = userResolver.resolve(userEmail);
         Document document = resolveDocument(docId, user);
 
         conversationRepository.findByDocumentIdAndUserId(document.getId(), user.getId())
@@ -92,7 +92,7 @@ public class ChatService {
                 return;
             }
 
-            User user = resolveUser(userEmail);
+            User user = userResolver.resolve(userEmail);
             Document document = resolveDocument(docId, user);
 
             if (!"READY".equals(document.getStatus())) {
@@ -140,9 +140,11 @@ public class ChatService {
                             String token = extractToken(chatResponse);
                             if (token != null && !token.isEmpty()) {
                                 fullResponse.append(token);
+                                java.util.Map<String, String> tokenData = new java.util.HashMap<>();
+                                tokenData.put("token", token);
                                 emitter.send(SseEmitter.event()
                                         .name("token")
-                                        .data("{\"token\":\"" + escapeJson(token) + "\"}"));
+                                        .data(objectMapper.writeValueAsString(tokenData)));
                             }
                         } catch (IOException e) {
                             // Client disconnected
@@ -165,14 +167,18 @@ public class ChatService {
                             ChatMessage savedMsg = messageRepository.save(assistantMsg);
 
                             // Send citations event
+                            java.util.Map<String, Object> citationsEventData = new java.util.HashMap<>();
+                            citationsEventData.put("citations", objectMapper.readTree(citationsJson));
                             emitter.send(SseEmitter.event()
                                     .name("citations")
-                                    .data("{\"citations\":" + citationsJson + "}"));
+                                    .data(objectMapper.writeValueAsString(citationsEventData)));
 
                             // Send done event
+                            java.util.Map<String, String> doneData = new java.util.HashMap<>();
+                            doneData.put("messageId", savedMsg.getId().toString());
                             emitter.send(SseEmitter.event()
                                     .name("done")
-                                    .data("{\"messageId\":\"" + savedMsg.getId() + "\"}"));
+                                    .data(objectMapper.writeValueAsString(doneData)));
 
                             emitter.complete();
                         } catch (IOException e) {
@@ -199,11 +205,6 @@ public class ChatService {
     // ────────────────────────────────────────────
     // Helpers
     // ────────────────────────────────────────────
-
-    private User resolveUser(String userEmail) {
-        return authRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-    }
 
     private Document resolveDocument(UUID docId, User user) {
         Document document = documentRepository.findById(docId)
@@ -241,31 +242,29 @@ public class ChatService {
     }
 
     private String buildCitationsJson(List<DocumentChunk> chunks) {
-        List<String> citationEntries = new ArrayList<>();
-        for (DocumentChunk chunk : chunks) {
-            citationEntries.add("{\"chunkIndex\":" + chunk.getChunkIndex() +
-                    ",\"pageNumber\":" + chunk.getPageNumber() + "}");
+        try {
+            List<java.util.Map<String, Object>> citations = new ArrayList<>();
+            for (DocumentChunk chunk : chunks) {
+                java.util.Map<String, Object> map = new java.util.HashMap<>();
+                map.put("chunkIndex", chunk.getChunkIndex());
+                map.put("pageNumber", chunk.getPageNumber());
+                citations.add(map);
+            }
+            return objectMapper.writeValueAsString(citations);
+        } catch (Exception e) {
+            return "[]";
         }
-        return "[" + String.join(",", citationEntries) + "]";
-    }
-
-    private String escapeJson(String text) {
-        if (text == null)
-            return "";
-        return text.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
     }
 
     private void sendErrorEvent(SseEmitter emitter, String message) {
         try {
+            java.util.Map<String, String> errorData = new java.util.HashMap<>();
+            errorData.put("message", message);
             emitter.send(SseEmitter.event()
                     .name("error")
-                    .data("{\"message\":\"" + escapeJson(message) + "\"}"));
+                    .data(objectMapper.writeValueAsString(errorData)));
             emitter.complete();
-        } catch (IOException e) {
+        } catch (Exception e) {
             // Client already disconnected
         }
     }

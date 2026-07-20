@@ -103,7 +103,7 @@ export async function register(email, password, name) {
   return responseData;
 }
 
-// Placeholder export methods for document operations to prevent compilation issues
+// Document operations
 export async function getDocuments() {
   return request('/documents');
 }
