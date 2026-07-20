@@ -47,7 +47,7 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationEnviro
             log.warn("Contains Whitespace : {}", pgPort.matches(".*\\s+.*"));
             log.warn("Contains '${{'      : {}", pgPort.contains("${{"));
             log.warn("Contains '$'        : {}", pgPort.contains("$"));
-            
+
             StringBuilder ascii = new StringBuilder();
             for (char c : pgPort.toCharArray()) {
                 ascii.append((int) c).append(' ');
@@ -59,21 +59,24 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationEnviro
 
         // 3. Spring Environment Resolution
         log.warn("--- SPRING ENVIRONMENT RESOLUTION ---");
-        
+
         log.warn("Property spring.datasource.url = {}",
                 env.getProperty("spring.datasource.url"));
-        
+
         log.warn("Property spring.datasource.username = {}",
                 env.getProperty("spring.datasource.username"));
-        
+
         log.warn("Property spring.datasource.password exists = {}",
                 env.containsProperty("spring.datasource.password"));
+
+        log.warn("DATABASE_URL = {}", System.getenv("DATABASE_URL"));
 
         log.warn("=== END DATASOURCE DIAGNOSTICS ===");
     }
 
     private static boolean isNumeric(String s) {
-        if (s == null || s.trim().isEmpty()) return false;
+        if (s == null || s.trim().isEmpty())
+            return false;
         try {
             Integer.parseInt(s.trim());
             return true;
@@ -83,12 +86,14 @@ public class StartupDiagnostics implements ApplicationListener<ApplicationEnviro
     }
 
     private static String mask(String value) {
-        if (value == null || value.length() <= 2) return value;
+        if (value == null || value.length() <= 2)
+            return value;
         return value.substring(0, 1) + "****" + value.substring(value.length() - 1);
     }
 
     private static String maskUrl(String url) {
-        if (url == null) return null;
+        if (url == null)
+            return null;
         return url.replaceAll("://([^:]+):([^@]+)@", "://$1:****@");
     }
 }
