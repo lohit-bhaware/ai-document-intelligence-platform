@@ -51,8 +51,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        configuration.setAllowedOrigins(origins);
+
+        // allowedOrigins: exact matches from FRONTEND_URL (e.g. your production domain).
+        // We also add a pattern covering any Vercel preview deployment for this project,
+        // since Vercel generates a new random-hash subdomain on every push
+        // (e.g. ai-document-intelligence-platform-<hash>.vercel.app or
+        // ai-document-intelligence-platform-<hash>-<team>.vercel.app).
+        List<String> exactOrigins = Arrays.asList(allowedOrigins.split(","));
+        List<String> originPatterns = new java.util.ArrayList<>(exactOrigins);
+        originPatterns.add("https://ai-document-intelligence-platform*.vercel.app");
+
+        configuration.setAllowedOriginPatterns(originPatterns);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
         configuration.setExposedHeaders(Collections.singletonList("Authorization"));
