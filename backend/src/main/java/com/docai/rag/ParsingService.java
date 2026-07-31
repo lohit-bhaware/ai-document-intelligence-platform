@@ -32,7 +32,7 @@ public class ParsingService {
                 for (int page = 1; page <= totalPages; page++) {
                     stripper.setStartPage(page);
                     stripper.setEndPage(page);
-                    String pageText = stripper.getText(pdDoc);
+                    String pageText = sanitize(stripper.getText(pdDoc));
                     if (pageText == null || pageText.trim().isEmpty()) {
                         continue;
                     }
@@ -40,10 +40,24 @@ public class ParsingService {
                 }
             }
         } else {
-            String text = Files.readString(filePath, StandardCharsets.UTF_8);
+            String text = sanitize(Files.readString(filePath, StandardCharsets.UTF_8));
             pages.add(new RagService.ParsedPage(text, 1));
         }
 
         return pages;
+    }
+
+    /**
+     * Postgres text/varchar columns reject the NUL byte (0x00) outright, and some
+     * PDFs (depending on their internal encoding or how they were generated) yield
+     * extracted text containing NUL or other C0 control characters. Strip anything
+     * Postgres can't store before it reaches the database, keeping normal whitespace
+     * (tab, newline, carriage return) intact.
+     */
+    private String sanitize(String text) {
+        if (text == null) {
+            return null;
+        }
+        return text.replaceAll("[\\x00\\x01-\\x08\\x0B\\x0C\\x0E-\\x1F]", "");
     }
 }
